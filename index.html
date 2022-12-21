@@ -1,0 +1,94 @@
+<html>
+<head>
+  <title>Dadda Detector</title>
+</head>
+<body>
+  <h1>Dadda Detector</h1>
+  <p>Plays our voice to soothe Dadda and help her fall asleep if she calls out in her sleep.</p>
+
+  <!-- Include the MP3 file that you want to play -->
+  <audio id="alarm" src="lullaby.m4a" preload="auto"></audio>
+
+  <input type="range" min="0" max="1" step="0.01" value="0.1" id="threshold-slider">
+  <label for="threshold-slider">Voice threshold: <span id="threshold-value">0.1</span></label>
+  <button id="start">Start Dadda Detector</button>
+
+  <script>
+    // Set the threshold for the noise level
+    const threshold = 0.5;
+    const thresholdSlider = document.getElementById('threshold-slider');
+    const thresholdValue = document.getElementById('threshold-value');
+    const button = document.getElementById('start');
+
+    // Initialize the Web Audio API
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    let noiseDetectionPaused = false;
+    
+
+    // Request permission to access the microphone
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(function(stream) {
+        // Create an audio node that will capture audio input from the microphone
+        const microphone = audioCtx.createMediaStreamSource(stream);
+
+        // Create an audio node that will perform the amplitude calculation
+        const processor = audioCtx.createScriptProcessor(1024, 1, 1);
+
+        // Connect the microphone to the processor
+        microphone.connect(processor);
+
+        // Set up a function to be called when the processor receives audio data
+        processor.onaudioprocess = function(event) {
+          if (noiseDetectionPaused) {
+            return;
+          }            
+          // Get the audio data from the input buffer
+          const inputBuffer = event.inputBuffer;
+          const inputData = inputBuffer.getChannelData(0);
+
+          // Calculate the root mean square (RMS) of the audio data
+          let rms = 0;
+          for (let i = 0; i < inputData.length; i++) {
+            rms += inputData[i] * inputData[i];
+          }
+          rms = Math.sqrt(rms / inputData.length);
+          console.log(rms)
+
+          // If the RMS is above the threshold, play the alarm
+          if (rms > thresholdSlider.value) {
+            const alarm = document.getElementById('alarm');
+            alarm.currentTime = 0;
+            alarm.play();
+          }
+        };
+
+        // Connect the processor to the audio output
+        processor.connect(audioCtx.destination);
+      })
+      .catch(function(error) {
+        console.error('Error accessing microphone:', error);
+      });
+
+    thresholdSlider.addEventListener('input', function() {
+    thresholdValue.textContent = thresholdSlider.value;
+    });
+
+    // Start the audio context when the user interacts with the page
+    button.addEventListener('click', function() {
+        audioCtx.resume().then(function() {
+            console.log('Audio context started');
+        });
+    });
+
+    document.getElementById('alarm').addEventListener('play', function() {
+    // Set the flag to pause the noise detection
+        noiseDetectionPaused = true;
+    });
+
+    document.getElementById('alarm').addEventListener('ended', function() {
+    // Reset the flag to resume the noise detection
+    noiseDetectionPaused = false;
+    });    
+  </script>
+</body>
+</html>      
